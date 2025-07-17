@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Verify links, text, images for scams at TrueOrScam.com">
+  <title>TrueOrScam.com - Is It Safe?</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 16pt;
+      background: #fff;
+      color: #000;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 600px;
+      margin: 20px auto;
+      padding: 20px;
+      background: #f0f0f0;
+      border-radius: 10px;
+    }
+    textarea, input {
+      width: 100%;
+      padding: 12px;
+      font-size: 16pt;
+      margin: 10px 0;
+      border: 2px solid #000;
+      border-radius: 5px;
+      box-sizing: border-box;
+    }
+    button {
+      font-size: 16pt;
+      padding: 12px 25px;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 8px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    #result {
+      font-size: 16pt;
+      margin: 15px 0;
+      padding: 10px;
+    }
+    .safe { color: green; }
+    .unsure { color: orange; }
+    .scam { color: red; }
+    #loading {
+      display: none;
+      font-size: 16pt;
+      color: #007bff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>TrueOrScam.com</h1>
+    <p>Paste a link or text, or upload an image to check if it's safe.</p>
+    <textarea id="content" rows="3" placeholder="Paste link, text, or message"></textarea>
+    <input type="file" id="fileInput" accept="image/*">
+    <button onclick="alert('Check Now placeholder')">Check Now</button>
+    <button onclick="alert('Listen placeholder')">Listen</button>
+    <div id="loading">Checking...</div>
+    <div id="result" aria-live="polite"></div>
+  </div>
+</body>
+</html>

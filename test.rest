@@ -1,0 +1,41 @@
+# Test backend /test endpoint
+GET http://localhost:3000/test
+
+###
+
+# Test backend /check endpoint
+POST http://localhost:3000/check
+Content-Type: application/json
+
+{
+  "type": "url",
+  "content": "http://paypa1.com"
+}
+
+###
+
+# Test OpenAI API
+POST https://api.openai.com/v1/chat/completions
+Authorization: Bearer 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
+Content-Type: application/json
+
+{
+  "model": "gpt-4",
+  "messages": [{"role": "user", "content": "Test"}]
+}
+
+###
+
+# Test Google Safe Browsing API
+POST https://safebrowsing.googleapis.com/v4/threatMatches:find?key=AIzaSyDL61TjA39esFEEFW0u3GkgXYn98PszHgM
+Content-Type: application/json
+
+{
+  "client": {"clientId": "trueorscam", "clientVersion": "1.0"},
+  "threatInfo": {
+    "threatTypes": ["MALWARE", "SOCIAL_ENGINEERING"],
+    "platformTypes": ["ANY_PLATFORM"],
+    "threatEntryTypes": ["URL"],
+    "threatEntries": [{"url": "http://paypa1.com"}]
+  }
+}
