@@ -2,141 +2,48 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>True or Scam</title>
+    <title>True or Scam — Detector</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <style>
-      :root {
-        --ok: #1b6;
-        --warn: #d89100;
-        --bad: #d43;
-      }
-      body {
-        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-        margin: 24px;
-        max-width: 760px;
-      }
-      h1 {
-        margin: 0 0 12px;
-      }
-      form {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-        align-items: center;
-      }
-      input,
-      textarea,
-      button {
-        font-size: 16px;
-        padding: 10px;
-        border-radius: 10px;
-        border: 1px solid #ddd;
-      }
-      input[type="url"] {
-        flex: 1 1 420px;
-      }
-      textarea {
-        width: 100%;
-        min-height: 90px;
-      }
-      button {
-        cursor: pointer;
-      }
-      .card {
-        border: 1px solid #eee;
-        border-radius: 14px;
-        padding: 14px;
-        margin-top: 16px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
-      }
-      .pill {
-        display: inline-block;
-        padding: 4px 10px;
-        border-radius: 999px;
-        font-weight: 700;
-      }
-      .ok {
-        background: #e9f9f1;
-        color: var(--ok);
-      }
-      .warn {
-        background: #fff5db;
-        color: var(--warn);
-      }
-      .bad {
-        background: #ffe8e8;
-        color: var(--bad);
-      }
-      .muted {
-        color: #666;
-        font-size: 14px;
-      }
-      code {
-        background: #f7f7f7;
-        padding: 2px 6px;
-        border-radius: 6px;
-      }
-    </style>
+    <link rel="stylesheet" href="/public/styles.css" />
   </head>
   <body>
-    <h1>True or Scam</h1>
-    <p class="muted">
-      Paste a link. Optionally add context. We’ll check Google Safe Browsing and
-      an AI classifier.
-    </p>
+    <header>
+      <h1>True or Scam</h1>
+      <p class="muted">
+        Paste a link/video/image URL, a text claim — or drop an image file.
+        We’ll detect the right checks automatically.
+      </p>
+    </header>
 
-    <form id="f">
-      <input id="u" type="url" placeholder="https://example.com" required />
-      <button type="submit">Check URL</button>
-      <textarea
-        id="ctx"
-        placeholder="Optional: paste email or page text here"
-      ></textarea>
-    </form>
+    <main>
+      <form id="detect-form" class="card" enctype="multipart/form-data">
+        <label>Detector input</label>
+        <textarea
+          id="detector-input"
+          placeholder="Paste URL or claim text here…"
+          rows="3"
+        ></textarea>
+        <div class="row">
+          <input id="file-input" type="file" accept="image/*" />
+          <input
+            id="context-input"
+            type="text"
+            placeholder="Context (optional)"
+          />
+        </div>
+        <button type="submit">Run detection</button>
+      </form>
 
-    <div id="out"></div>
+      <div id="result"></div>
+    </main>
 
-    <script>
-      const out = document.getElementById("out");
-      document.getElementById("f").addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const url = document.getElementById("u").value.trim();
-        const context = document.getElementById("ctx").value.trim();
-        out.innerHTML = '<div class="card">Checking…</div>';
-        try {
-          const r = await fetch("/api/check", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ url, context }),
-          });
-          const data = await r.json();
-          if (!r.ok) throw new Error(data.error || r.statusText);
+    <footer class="muted">
+      <p>
+        Goal: fill the fraud-detection gap for links, images, video & news
+        claims.
+      </p>
+    </footer>
 
-          const tag = (v) =>
-            v.includes("likely")
-              ? "bad"
-              : v.includes("suspicious")
-              ? "warn"
-              : "ok";
-          out.innerHTML = `
-          <div class="card">
-            <div>URL: <code>${data.url}</code></div>
-            <p>Verdict: <span class="pill ${tag(data.verdict)}">${
-            data.verdict
-          }</span></p>
-            <p>Google Safe Browsing: <span class="pill ${
-              data.safeBrowsing === "flagged" ? "bad" : "ok"
-            }">${data.safeBrowsing}</span></p>
-            ${
-              data.ai
-                ? `<p class="muted">AI: <b>${data.ai.risk}</b> — ${data.ai.rationale}</p>`
-                : "<p class='muted'>AI disabled (no API key)</p>"
-            }
-          </div>`;
-        } catch (err) {
-          out.innerHTML = `<div class="card bad">Error: ${err.message}</div>`;
-        }
-      });
-    </script>
+    <script src="/public/app.js" defer></script>
   </body>
 </html>

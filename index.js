@@ -2,51 +2,18 @@ import express from "express";
 import morgan from "morgan";
 import cors from "cors";
 import fetch from "node-fetch";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 import "dotenv/config";
 
 const app = express();
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "2mb" }));
 app.use(morgan("dev"));
 app.use(cors());
+app.use("/public", express.static("public"));
 
-// ---- rate limiter ----
-function rateLimit({ windowMs = 60_000, max = 60 } = {}) {
-  const hits = new Map();
-  return (req, res, next) => {
-    const ip =
-      req.ip ||
-      req.headers["x-forwarded-for"] ||
-      req.connection?.remoteAddress ||
-      "unknown";
-    const now = Date.now();
-    const entry = hits.get(ip) || { count: 0, start: now };
-    if (now - entry.start > windowMs) {
-      entry.count = 0;
-      entry.start = now;
-    }
-    entry.count += 1;
-    hits.set(ip, entry);
-    if (entry.count > max)
-      return res.status(429).json({ error: "Too many requests, slow down." });
-    next();
-  };
-}
-app.use(rateLimit());
-
-// ---- cache ----
-const cache = new Map();
-const setCache = (k, d, ttl = 10 * 60_000) =>
-  cache.set(k, { d, t: Date.now() + ttl });
-const getCache = (k) => {
-  const v = cache.get(k);
-  if (!v) return null;
-  if (Date.now() > v.t) {
-    cache.delete(k);
-    return null;
-  }
-  return v.d;
-};
-
+/* -------- utils -------- */
 const normalizeUrl = (u) => {
   try {
     const x = new URL(u);
@@ -56,10 +23,31 @@ const normalizeUrl = (u) => {
     return null;
   }
 };
+const isLikelyImageUrl = (u) =>
+  /\.(png|jpe?g|gif|webp|bmp|tiff?)(\?|#|$)/i.test(u);
+const isLikelyVideoUrl = (u) =>
+  /(youtube\.com|youtu\.be|vimeo\.com|\.mp4(\?|#|$))/i.test(u);
 
+function ytId(u) {
+  try {
+    const url = new URL(u);
+    if (url.hostname.includes("youtube.com")) return url.searchParams.get("v");
+    if (url.hostname === "youtu.be") return url.pathname.slice(1);
+  } catch {}
+  return null;
+}
+const ytThumb = (id) =>
+  id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null;
+
+const upload = multer({
+  dest: "uploads/",
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+/* -------- Google Safe Browsing -------- */
 async function checkSafeBrowsing(url) {
   const key = process.env.GOOGLE_SAFE_BROWSING_KEY;
-  if (!key) throw new Error("Missing GOOGLE_SAFE_BROWSING_KEY");
+  if (!key) return { flagged: false, raw: { disabled: true } };
   const resp = await fetch(
     `https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${key}`,
     {
@@ -81,128 +69,220 @@ async function checkSafeBrowsing(url) {
       }),
     }
   );
-  const data = await resp.json();
+  let data;
+  try {
+    data = await resp.json();
+  } catch {
+    data = { error: "non-JSON response" };
+  }
+  if (!resp.ok)
+    return { flagged: false, raw: { error: data, status: resp.status } };
   const flagged = Array.isArray(data?.matches) && data.matches.length > 0;
   return { flagged, raw: data };
 }
 
-async function aiAssess({ url, safeBrowsingFlagged, context }) {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) return null; // optional
-  const prompt = `
-You are a security assistant. Classify the risk of this URL as "safe", "suspicious", or "likely scam". Be concise.
-Return ONLY JSON: {"risk":"...","rationale":"..."}.
+/* -------- Gemini Helpers -------- */
+const GEMINI_KEY = process.env.GEMINI_API_KEY;
 
-URL: ${url}
-SafeBrowsingFlagged: ${safeBrowsingFlagged}
-UserContext: ${context || "(none)"}
-`.trim();
-
-  const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0,
-    }),
-  });
-  const json = await resp.json();
-  let content = json?.choices?.[0]?.message?.content || "{}";
-  const m = content.match(/\{[\s\S]*\}/);
-  if (m) content = m[0];
+// For text-only prompts
+async function geminiText(prompt) {
   try {
-    return JSON.parse(content);
-  } catch {
-    return null;
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+        }),
+      }
+    );
+    const data = await resp.json();
+    if (!resp.ok)
+      return {
+        _error: `Gemini error ${resp.status}: ${
+          data.error?.message || "unknown"
+        }`,
+      };
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const m = text.match(/\{[\s\S]*\}/);
+    if (m) {
+      try {
+        return JSON.parse(m[0]);
+      } catch {}
+    }
+    return { _error: "Bad/empty JSON from Gemini", raw: text };
+  } catch (e) {
+    return { _error: "Gemini request failed: " + e.message };
   }
 }
 
-app.get("/health", (_req, res) =>
-  res.json({ ok: true, time: new Date().toISOString() })
+// For image+text
+async function geminiVision({ prompt, imageUrl }) {
+  try {
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: prompt },
+                {
+                  inlineData: {
+                    mimeType: "image/jpeg",
+                    data: imageUrl.split(",")[1] || "",
+                  },
+                },
+              ],
+            },
+          ],
+        }),
+      }
+    );
+    const data = await resp.json();
+    if (!resp.ok)
+      return {
+        _error: `Gemini error ${resp.status}: ${
+          data.error?.message || "unknown"
+        }`,
+      };
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const m = text.match(/\{[\s\S]*\}/);
+    if (m) {
+      try {
+        return JSON.parse(m[0]);
+      } catch {}
+    }
+    return { _error: "Bad/empty JSON from Gemini", raw: text };
+  } catch (e) {
+    return { _error: "Gemini request failed: " + e.message };
+  }
+}
+
+/* -------- Detector Endpoint -------- */
+const uploadSingle = upload.single("file");
+app.post("/api/detect", (req, res) =>
+  uploadSingle(req, res, async (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+
+    try {
+      const { input, context } = req.body || {};
+      const trimmed = (input || "").trim();
+
+      // File upload (image)
+      if (req.file) {
+        const b = fs.readFileSync(req.file.path);
+        const dataUrl =
+          `data:${req.file.mimetype};base64,` + b.toString("base64");
+        const ai = await geminiVision({
+          prompt: `
+Analyze this image for manipulation/deepfake/fraud.
+Return JSON: {"verdict":"authentic|edited|uncertain","indicators":["..."],"advice":"..."}
+Context: ${context || "(none)"}.
+`.trim(),
+          imageUrl: dataUrl,
+        });
+        fs.unlink(req.file.path, () => {});
+        return res.json({
+          mode: "file",
+          detected: "image_upload",
+          verdict: ai?.verdict || "unverified",
+          ai,
+        });
+      }
+
+      // URL input
+      const url = normalizeUrl(trimmed);
+      if (url) {
+        if (isLikelyImageUrl(url)) {
+          const ai = await geminiText(`
+Analyze this image URL for manipulation/deepfake/fraud:
+${url}
+Return JSON: {"verdict":"authentic|edited|uncertain","indicators":["..."],"advice":"..."}
+Context: ${context || "(none)"}.
+        `);
+          return res.json({
+            mode: "url",
+            type: "image_url",
+            url,
+            verdict: ai?.verdict || "unverified",
+            ai,
+          });
+        }
+
+        if (isLikelyVideoUrl(url)) {
+          const id = ytId(url);
+          const thumb = ytThumb(id);
+          const ai = await geminiText(`
+Analyze this video URL for scam/deepfake risk:
+${url}
+Thumbnail: ${thumb || "none"}
+Return JSON: {"risk":"safe|suspicious|likely scam","signals":["..."],"advice":"..."}
+Context: ${context || "(none)"}.
+        `);
+          return res.json({
+            mode: "url",
+            type: "video_url",
+            url,
+            thumbnailUrl: thumb,
+            verdict: ai?.risk || "unverified",
+            ai,
+          });
+        }
+
+        const sb = await checkSafeBrowsing(url);
+        const ai = await geminiText(`
+Classify this URL as safe/suspicious/likely scam:
+${url}
+SafeBrowsingFlagged: ${sb.flagged}
+Return JSON: {"risk":"safe|suspicious|likely scam","signals":["..."],"advice":"..."}
+Context: ${context || "(none)"}.
+      `);
+        return res.json({
+          mode: "url",
+          type: "link",
+          url,
+          verdict: sb.flagged ? "likely scam" : ai?.risk || "clear",
+          safeBrowsing: sb.flagged ? "flagged" : "clear",
+          ai,
+        });
+      }
+
+      // Claim / Text
+      if (!trimmed)
+        return res
+          .status(400)
+          .json({ error: "Provide URL, text, or image file." });
+      const ai = await geminiText(`
+Verify this claim/headline: "${trimmed}"
+Return JSON: {"verdict":"unverified|likely true|likely false|misleading","checks":[{"step":"...","why":"..."}],"what_to_collect":["..."],"advice":"..."}
+Context: ${context || "(none)"}.
+    `);
+      return res.json({
+        mode: "text",
+        detected: "claim",
+        verdict: ai?.verdict || "unverified",
+        ai,
+      });
+    } catch (e) {
+      console.error(e);
+      return res.status(500).json({ error: "Internal error" });
+    }
+  })
 );
 
-app.post("/api/check", async (req, res) => {
-  try {
-    const { url: raw, context } = req.body || {};
-    const url = normalizeUrl(raw);
-    if (!url)
-      return res
-        .status(400)
-        .json({ error: "Invalid or missing URL (http/https only)." });
+/* Serve frontend */
+app.get("/", (_req, res) => res.sendFile(path.resolve("index.html")));
 
-    const cached = getCache(url);
-    if (cached) return res.json({ cached: true, ...cached });
-
-    const sb = await checkSafeBrowsing(url);
-    const ai = await aiAssess({
-      url,
-      safeBrowsingFlagged: sb.flagged,
-      context,
-    });
-    const verdict = sb.flagged ? "likely scam" : ai?.risk || "clear";
-
-    const result = {
-      url,
-      verdict,
-      safeBrowsing: sb.flagged ? "flagged" : "clear",
-      ai: ai || undefined,
-    };
-    setCache(url, result);
-    res.json(result);
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "Internal error" });
-  }
+app.listen(process.env.PORT || 3000, () => {
+  console.log(
+    `✓ TrueOrScam (Gemini edition) listening on http://localhost:${
+      process.env.PORT || 3000
+    }`
+  );
 });
-
-app.post("/api/explain", async (req, res) => {
-  try {
-    const key = process.env.OPENAI_API_KEY;
-    if (!key) return res.status(400).json({ error: "OPENAI_API_KEY not set." });
-    const { text, html, url } = req.body || {};
-    const content = text || html || "";
-    if (!content && !url)
-      return res.status(400).json({ error: "Provide text/html and/or url." });
-
-    const prompt = `
-Analyze this content for scam indicators. Output JSON:
-{"verdict":"safe|suspicious|likely scam","indicators":["...","..."],"advice":"..."}
-URL(optional): ${url || "(none)"}
-CONTENT START
-${content.slice(0, 6000)}
-CONTENT END
-`.trim();
-
-    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0,
-      }),
-    });
-    const json = await resp.json();
-    let contentOut = json?.choices?.[0]?.message?.content || "{}";
-    const m = contentOut.match(/\{[\s\S]*\}/);
-    if (m) contentOut = m[0];
-    const parsed = JSON.parse(contentOut);
-    res.json(parsed);
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "Internal error" });
-  }
-});
-
-app.use(express.static("."));
-const port = process.env.PORT || 3000;
-app.listen(port, () =>
-  console.log(`✓ TrueOrScam listening on http://localhost:${port}`)
-);
