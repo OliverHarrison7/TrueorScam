@@ -19,7 +19,12 @@ button { margin-top: 12px; cursor: pointer; }
 .warn { background: #fff5db; color: var(--warn); }
 .bad { background: #ffe8e8; color: var(--bad); }
 code { background: #f7f7f7; padding: 2px 6px; border-radius: 6px; }
+
 img.thumb { max-width: 100%; border-radius: 12px; border: 1px solid var(--border); }
 small.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color:#555; }
+
+details { margin-top: 8px; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; }
+details > summary { cursor: pointer; font-weight: 600; }
+pre { white-space: pre-wrap; word-break: break-word; background: #f7f7f7; padding: 8px; border-radius: 8px; }
 
 form.drag { outline: 2px dashed #bbb; background: #fff; }

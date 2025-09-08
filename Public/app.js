@@ -82,6 +82,13 @@ form.addEventListener("submit", async (e) => {
         `
             : aiMsg(data.ai)
         }
+        ${
+          data.exif
+            ? `<details><summary>EXIF</summary><pre>${esc(
+                JSON.stringify(data.exif, null, 2)
+              )}</pre></details>`
+            : ""
+        }
       `);
       return;
     }
@@ -114,20 +121,6 @@ form.addEventListener("submit", async (e) => {
               ? `<div><img class="thumb" src="${esc(
                   data.thumbnailUrl
                 )}" alt="Thumbnail" /></div>`
-              : ""
-          }
-          ${
-            data.vision && !data.vision._error
-              ? `
-            <p>Thumbnail analysis: <span class="pill ${pillClass(
-              data.vision.verdict
-            )}">${esc(data.vision.verdict)}</span></p>
-            <ul>${(data.vision.indicators || [])
-              .map((s) => `<li>${esc(s)}</li>`)
-              .join("")}</ul>
-          `
-              : data.vision
-              ? aiMsg(data.vision)
               : ""
           }
           ${
@@ -167,6 +160,15 @@ form.addEventListener("submit", async (e) => {
           <p class="muted"><b>Advice:</b> ${esc(data.ai.advice)}</p>
         `
             : aiMsg(data.ai)
+        }
+        ${
+          data.signals
+            ? `
+          <details><summary>Technical signals</summary>
+            <pre>${esc(JSON.stringify(data.signals, null, 2))}</pre>
+          </details>
+        `
+            : ""
         }
       `);
       return;
