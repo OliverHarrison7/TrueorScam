@@ -1,41 +1,28 @@
-# Test backend /test endpoint
-GET http://localhost:3000/test
+### Health
+GET http://localhost:3000/health
 
-###
-
-# Test backend /check endpoint
-POST http://localhost:3000/check
+### Check a safe site
+POST http://localhost:3000/api/check
 Content-Type: application/json
 
 {
-  "type": "url",
-  "content": "http://paypa1.com"
+  "url": "https://www.wikipedia.org"
 }
 
-###
-
-# Test OpenAI API
-POST https://api.openai.com/v1/chat/completions
-Authorization: Bearer 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
+### Check a suspicious-looking URL
+POST http://localhost:3000/api/check
 Content-Type: application/json
 
 {
-  "model": "gpt-4",
-  "messages": [{"role": "user", "content": "Test"}]
+  "url": "http://secure-login-paypal.com-account-verify.cn",
+  "context": "Email claims account locked; asks to log in."
 }
 
-###
-
-# Test Google Safe Browsing API
-POST https://safebrowsing.googleapis.com/v4/threatMatches:find?key=AIzaSyDL61TjA39esFEEFW0u3GkgXYn98PszHgM
+### Explain content (AI)
+POST http://localhost:3000/api/explain
 Content-Type: application/json
 
 {
-  "client": {"clientId": "trueorscam", "clientVersion": "1.0"},
-  "threatInfo": {
-    "threatTypes": ["MALWARE", "SOCIAL_ENGINEERING"],
-    "platformTypes": ["ANY_PLATFORM"],
-    "threatEntryTypes": ["URL"],
-    "threatEntries": [{"url": "http://paypa1.com"}]
-  }
+  "url":"http://secure-login-paypal.com-account-verify.cn",
+  "text": "Your account is suspended. Verify your identity here: http://secure-login-paypal.com-account-verify.cn"
 }

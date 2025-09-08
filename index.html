@@ -1,74 +1,142 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Verify links, text, images for scams at TrueOrScam.com">
-  <title>TrueOrScam.com - Is It Safe?</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      font-size: 16pt;
-      background: #fff;
-      color: #000;
-      text-align: center;
-      margin: 0;
-      padding: 0;
-    }
-    .container {
-      max-width: 600px;
-      margin: 20px auto;
-      padding: 20px;
-      background: #f0f0f0;
-      border-radius: 10px;
-    }
-    textarea, input {
-      width: 100%;
-      padding: 12px;
-      font-size: 16pt;
-      margin: 10px 0;
-      border: 2px solid #000;
-      border-radius: 5px;
-      box-sizing: border-box;
-    }
-    button {
-      font-size: 16pt;
-      padding: 12px 25px;
-      background: #007bff;
-      color: #fff;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      margin: 8px;
-    }
-    button:hover {
-      background: #0056b3;
-    }
-    #result {
-      font-size: 16pt;
-      margin: 15px 0;
-      padding: 10px;
-    }
-    .safe { color: green; }
-    .unsure { color: orange; }
-    .scam { color: red; }
-    #loading {
-      display: none;
-      font-size: 16pt;
-      color: #007bff;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>TrueOrScam.com</h1>
-    <p>Paste a link or text, or upload an image to check if it's safe.</p>
-    <textarea id="content" rows="3" placeholder="Paste link, text, or message"></textarea>
-    <input type="file" id="fileInput" accept="image/*">
-    <button onclick="alert('Check Now placeholder')">Check Now</button>
-    <button onclick="alert('Listen placeholder')">Listen</button>
-    <div id="loading">Checking...</div>
-    <div id="result" aria-live="polite"></div>
-  </div>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <title>True or Scam</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        --ok: #1b6;
+        --warn: #d89100;
+        --bad: #d43;
+      }
+      body {
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        margin: 24px;
+        max-width: 760px;
+      }
+      h1 {
+        margin: 0 0 12px;
+      }
+      form {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      input,
+      textarea,
+      button {
+        font-size: 16px;
+        padding: 10px;
+        border-radius: 10px;
+        border: 1px solid #ddd;
+      }
+      input[type="url"] {
+        flex: 1 1 420px;
+      }
+      textarea {
+        width: 100%;
+        min-height: 90px;
+      }
+      button {
+        cursor: pointer;
+      }
+      .card {
+        border: 1px solid #eee;
+        border-radius: 14px;
+        padding: 14px;
+        margin-top: 16px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+      }
+      .pill {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-weight: 700;
+      }
+      .ok {
+        background: #e9f9f1;
+        color: var(--ok);
+      }
+      .warn {
+        background: #fff5db;
+        color: var(--warn);
+      }
+      .bad {
+        background: #ffe8e8;
+        color: var(--bad);
+      }
+      .muted {
+        color: #666;
+        font-size: 14px;
+      }
+      code {
+        background: #f7f7f7;
+        padding: 2px 6px;
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>True or Scam</h1>
+    <p class="muted">
+      Paste a link. Optionally add context. We’ll check Google Safe Browsing and
+      an AI classifier.
+    </p>
+
+    <form id="f">
+      <input id="u" type="url" placeholder="https://example.com" required />
+      <button type="submit">Check URL</button>
+      <textarea
+        id="ctx"
+        placeholder="Optional: paste email or page text here"
+      ></textarea>
+    </form>
+
+    <div id="out"></div>
+
+    <script>
+      const out = document.getElementById("out");
+      document.getElementById("f").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const url = document.getElementById("u").value.trim();
+        const context = document.getElementById("ctx").value.trim();
+        out.innerHTML = '<div class="card">Checking…</div>';
+        try {
+          const r = await fetch("/api/check", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url, context }),
+          });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.error || r.statusText);
+
+          const tag = (v) =>
+            v.includes("likely")
+              ? "bad"
+              : v.includes("suspicious")
+              ? "warn"
+              : "ok";
+          out.innerHTML = `
+          <div class="card">
+            <div>URL: <code>${data.url}</code></div>
+            <p>Verdict: <span class="pill ${tag(data.verdict)}">${
+            data.verdict
+          }</span></p>
+            <p>Google Safe Browsing: <span class="pill ${
+              data.safeBrowsing === "flagged" ? "bad" : "ok"
+            }">${data.safeBrowsing}</span></p>
+            ${
+              data.ai
+                ? `<p class="muted">AI: <b>${data.ai.risk}</b> — ${data.ai.rationale}</p>`
+                : "<p class='muted'>AI disabled (no API key)</p>"
+            }
+          </div>`;
+        } catch (err) {
+          out.innerHTML = `<div class="card bad">Error: ${err.message}</div>`;
+        }
+      });
+    </script>
+  </body>
 </html>
