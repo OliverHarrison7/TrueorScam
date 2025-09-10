@@ -1,48 +1,161 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="system">
   <head>
     <meta charset="utf-8" />
-    <title>True or Scam — Detector</title>
+    <title>TrueOrScam — Detector</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="/public/styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128'%3E%3Ctext y='1em' font-size='96'%3E🔎%3C/text%3E%3C/svg%3E"
+    />
   </head>
   <body>
-    <header>
-      <h1>True or Scam</h1>
-      <p class="muted">
-        Paste a link/video/image URL, a text claim — or drop an image file.
-        We’ll detect the right checks automatically.
-      </p>
+    <!-- Ambient blobs -->
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="grain"></div>
+
+    <!-- Top bar -->
+    <header class="topbar">
+      <div class="container row between center">
+        <div class="brand">
+          <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+            <defs>
+              <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#60a5fa" />
+                <stop offset="1" stop-color="#22d3ee" />
+              </linearGradient>
+            </defs>
+            <circle cx="28" cy="28" r="20" fill="url(#g1)" />
+            <rect
+              x="40"
+              y="40"
+              width="16"
+              height="6"
+              rx="3"
+              transform="rotate(45 48 43)"
+              fill="#fff"
+              opacity=".9"
+            />
+          </svg>
+          <span class="title">True<span class="accent">Or</span>Scam</span>
+        </div>
+        <div class="actions">
+          <button id="theme-toggle" class="ghost" aria-label="Toggle theme">
+            <span class="only-light">🌙</span>
+            <span class="only-dark">☀️</span>
+          </button>
+          <a
+            class="ghost"
+            href="https://github.com/OliverHarrison7/TrueorScam"
+            target="_blank"
+            rel="noreferrer"
+            >GitHub</a
+          >
+        </div>
+      </div>
     </header>
 
-    <main>
-      <form id="detect-form" class="card" enctype="multipart/form-data">
-        <label>Detector input</label>
-        <textarea
-          id="detector-input"
-          placeholder="Paste URL or claim text here…"
-          rows="3"
-        ></textarea>
-        <div class="row">
-          <input id="file-input" type="file" accept="image/*" />
-          <input
-            id="context-input"
-            type="text"
-            placeholder="Context (optional)"
-          />
-        </div>
-        <button type="submit">Run detection</button>
-      </form>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="container">
+        <h1 class="headline">
+          Verify links, images, video & claims —
+          <span class="grad">instantly</span>.
+        </h1>
+        <p class="subtitle">
+          Paste a URL or claim, or drop an image. We auto-detect the type and
+          return a structured verdict with signals.
+        </p>
 
-      <div id="result"></div>
+        <div class="chips">
+          <span class="chip">🔗 Links</span>
+          <span class="chip">🖼️ Images</span>
+          <span class="chip">🎬 Video</span>
+          <span class="chip">📰 Claims</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main -->
+    <main class="container grid">
+      <!-- Detector -->
+      <section class="card glass pop">
+        <div class="card-header">
+          <h2 class="card-title">Detector</h2>
+          <p class="muted">One input. Smart routing. Clear verdicts.</p>
+        </div>
+
+        <form id="detect-form" class="detector" enctype="multipart/form-data">
+          <label class="label">Input</label>
+          <textarea
+            id="detector-input"
+            placeholder="Paste a URL (link / image / video) or a claim…"
+          ></textarea>
+
+          <div class="field-row">
+            <div class="file">
+              <input id="file-input" type="file" accept="image/*" />
+              <span class="file-label">or drop an image here</span>
+            </div>
+            <input
+              id="context-input"
+              type="text"
+              class="context"
+              placeholder="Context (optional)"
+            />
+          </div>
+
+          <div class="row between center">
+            <div class="hints muted">
+              <span class="kbd">⌘/Ctrl</span> +
+              <span class="kbd">Enter</span> to run • Drag & drop supported
+            </div>
+            <button class="btn primary" type="submit" id="run-btn">
+              <span class="btn-icon">▶</span> Run detection
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Result -->
+      <section class="card glass pop">
+        <div class="card-header row between center">
+          <h2 class="card-title">Result</h2>
+          <div class="row gap">
+            <button id="copy-json" class="ghost small" title="Copy raw JSON">
+              Copy JSON
+            </button>
+            <button id="clear-result" class="ghost small" title="Clear">
+              Clear
+            </button>
+          </div>
+        </div>
+        <div id="result" class="result-area">
+          <div class="placeholder">
+            <div class="placeholder-icon">🧪</div>
+            <p class="muted">Your analysis will appear here.</p>
+          </div>
+        </div>
+      </section>
     </main>
 
-    <footer class="muted">
-      <p>
-        Goal: fill the fraud-detection gap for links, images, video & news
-        claims.
-      </p>
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container row between wrap">
+        <p class="muted">
+          Built to close the fraud-detection gap in the age of AI media.
+        </p>
+        <p class="muted">
+          Gemini + Safe Browsing + heuristics ·
+          <a href="/" class="link">Detector</a>
+        </p>
+      </div>
     </footer>
+
+    <!-- Toast -->
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <script src="/public/app.js" defer></script>
   </body>
