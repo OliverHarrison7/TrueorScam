@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="system">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="utf-8" />
     <title>TrueOrScam — Detector</title>
@@ -16,7 +16,7 @@
     <div class="blob b2"></div>
     <div class="grain"></div>
 
-    <!-- Top bar -->
+    <!-- Top bar (no GitHub link) -->
     <header class="topbar">
       <div class="container row between center">
         <div class="brand">
@@ -43,16 +43,9 @@
         </div>
         <div class="actions">
           <button id="theme-toggle" class="ghost" aria-label="Toggle theme">
-            <span class="only-light">🌙</span>
-            <span class="only-dark">☀️</span>
+            <span class="icon only-light">🌙</span>
+            <span class="icon only-dark">☀️</span>
           </button>
-          <a
-            class="ghost"
-            href="https://github.com/OliverHarrison7/TrueorScam"
-            target="_blank"
-            rel="noreferrer"
-            >GitHub</a
-          >
         </div>
       </div>
     </header>
@@ -60,33 +53,17 @@
     <!-- Hero -->
     <section class="hero">
       <div class="container">
-        <h1 class="headline">
-          Verify links, images, video & claims —
-          <span class="grad">instantly</span>.
-        </h1>
+        <h1 class="headline">Verify links, images, video & claims — fast.</h1>
         <p class="subtitle">
           Paste a URL or claim, or drop an image. We auto-detect the type and
-          return a structured verdict with signals.
+          return a clear verdict.
         </p>
-
-        <div class="chips">
-          <span class="chip">🔗 Links</span>
-          <span class="chip">🖼️ Images</span>
-          <span class="chip">🎬 Video</span>
-          <span class="chip">📰 Claims</span>
-        </div>
       </div>
     </section>
 
-    <!-- Main -->
-    <main class="container grid">
-      <!-- Detector -->
+    <!-- Single column for simplicity -->
+    <main class="container">
       <section class="card glass pop">
-        <div class="card-header">
-          <h2 class="card-title">Detector</h2>
-          <p class="muted">One input. Smart routing. Clear verdicts.</p>
-        </div>
-
         <form id="detect-form" class="detector" enctype="multipart/form-data">
           <label class="label">Input</label>
           <textarea
@@ -119,18 +96,9 @@
         </form>
       </section>
 
-      <!-- Result -->
       <section class="card glass pop">
-        <div class="card-header row between center">
+        <div class="card-header">
           <h2 class="card-title">Result</h2>
-          <div class="row gap">
-            <button id="copy-json" class="ghost small" title="Copy raw JSON">
-              Copy JSON
-            </button>
-            <button id="clear-result" class="ghost small" title="Clear">
-              Clear
-            </button>
-          </div>
         </div>
         <div id="result" class="result-area">
           <div class="placeholder">
@@ -141,20 +109,14 @@
       </section>
     </main>
 
-    <!-- Footer -->
     <footer class="footer">
-      <div class="container row between wrap">
+      <div class="container">
         <p class="muted">
           Built to close the fraud-detection gap in the age of AI media.
-        </p>
-        <p class="muted">
-          Gemini + Safe Browsing + heuristics ·
-          <a href="/" class="link">Detector</a>
         </p>
       </div>
     </footer>
 
-    <!-- Toast -->
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <script src="/public/app.js" defer></script>
